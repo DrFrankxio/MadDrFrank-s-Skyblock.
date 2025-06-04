@@ -1,0 +1,1199 @@
+<link rel="icon" type="image/png" href="http://i66.tinypic.com/102qp9g.jpg">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/100/three.js"></script>
+<script src="https://mrdoob.github.io/stats.js/build/stats.min.js"></script>
+<img src="cursor.png" style="position:absolute;right:49%;top:49%;width:2%"></img>
+<div id="coords"></div>
+<style>
+  @font-face {
+    font-family: mcFont;
+    src: url(font.woff);
+  }
+
+  #coords {
+    font-family: mcFont;
+    color: white;
+    font-size: 20px;
+    position: absolute;
+    right: 2%;
+    top: 2%;
+
+    /* Contorno negro usando text-shadow */
+    text-shadow:
+      -1px -1px 0 #000,
+       1px -1px 0 #000,
+      -1px  1px 0 #000,
+       1px  1px 0 #000;
+  }
+</style>
+<script>
+setTimeout(() => {
+  let breaking = false; // flag de ruptura
+  let breakProgress = 0; // progreso
+  let breakTarget = null; // objeto objetivo
+  let breakTimer = null;
+
+  window.addEventListener('contextmenu', event => event.preventDefault());
+  window.addEventListener("wheel", e => e.preventDefault(), { passive: false });
+
+  const stats = new Stats();
+  stats.showPanel(0);
+  document.body.appendChild(stats.dom);
+  function animateStats() {
+    stats.begin();
+    stats.end();
+    requestAnimationFrame(animateStats);
+  }
+  animateStats();
+
+  const raycaster = new THREE.Raycaster();
+  w = Math.floor(Math.random() * 1000000);
+  cube = {};
+  xa = 0;
+  ya = 0;
+  k = [];
+  onkeydown = onkeyup = (e) => { k[e.keyCode] = e.type == "keydown" }
+
+  document.body.requestPointerLock = document.body.requestPointerLock || document.body.mozRequestPointerLock;
+
+  box = new THREE.BoxGeometry(1, 1, 1);
+
+  loader = new THREE.TextureLoader();
+
+  dirt_texture = loader.load("dirt.jpg");
+  grass_dirt_texture = loader.load("grass_dirt.jpeg");
+  grass_texture = loader.load("grass.jpeg");
+  barrel_side_texture = loader.load("barrel_side.jpeg");
+  barrel_top_texture = loader.load("barrel_top.jpg");
+  barrel_sprite = loader.load("barrel.png");
+  tnt_texture = loader.load("tnt_front.jpg");
+  sack_side_texture = loader.load("sack_side.png");
+  sack_top_texture = loader.load("sack_top.png");
+  sack_sprite=loader.load("sack.png")
+  melon_side_texture = loader.load("melon_side.jpg");
+  melon_top_texture = loader.load("melon_top.jpeg");
+  melon_sprite = loader.load("melon.png");
+  pumpkin_side_texture = loader.load("pumpkin_side.jpg");
+  pumpkin_top_texture = loader.load("pumpkin_top.jpeg");
+  pumpkin_sprite = loader.load("pumpkin.png");
+  bambu_side_texture = loader.load("bambu_side.jpeg");
+  bambu_top_texture = loader.load("bambu_top.png");
+
+  dirt_material = new THREE.MeshBasicMaterial({ map: dirt_texture });
+  grass_dirt_material = new THREE.MeshBasicMaterial({ map: grass_dirt_texture });
+  grass_material = new THREE.MeshBasicMaterial({ map: grass_texture });
+  barrel_side_material = new THREE.MeshBasicMaterial({ map: barrel_side_texture });
+  barrel_top_material = new THREE.MeshBasicMaterial({ map: barrel_top_texture });
+  tnt_material = new THREE.MeshBasicMaterial({ map: tnt_texture });
+  sack_side_material = new THREE.MeshBasicMaterial({ map: sack_side_texture });
+  sack_top_material = new THREE.MeshBasicMaterial({ map: sack_top_texture });
+  melon_side_material = new THREE.MeshBasicMaterial({ map: melon_side_texture });
+  melon_top_material = new THREE.MeshBasicMaterial({ map: melon_top_texture });
+  pumpkin_side_material = new THREE.MeshBasicMaterial({ map: pumpkin_side_texture });
+  pumpkin_top_material = new THREE.MeshBasicMaterial({ map: pumpkin_top_texture });
+  bambu_side_material = new THREE.MeshBasicMaterial({ map: bambu_side_texture });
+  bambu_top_material = new THREE.MeshBasicMaterial({ map: bambu_top_texture });
+
+  grass_dirt_material_full = [
+    grass_dirt_material,
+    grass_dirt_material,
+    grass_material,
+    dirt_material,
+    grass_dirt_material,
+    grass_dirt_material,
+  ];
+
+  barrel_material = [
+    barrel_side_material,
+    barrel_side_material,
+    barrel_top_material,
+    barrel_top_material,
+    barrel_side_material,
+    barrel_side_material,
+  ];
+
+  sack_material = [
+    sack_side_material,
+    sack_side_material,
+    sack_top_material,
+    sack_side_material,
+    sack_side_material,
+    sack_side_material,
+  ];
+
+  melon_material = [
+    melon_side_material,
+    melon_side_material,
+    melon_top_material,
+    melon_top_material,
+    melon_side_material,
+    melon_side_material,
+  ];
+
+  pumpkin_material = [
+    pumpkin_side_material,
+    pumpkin_side_material,
+    pumpkin_top_material,
+    pumpkin_top_material,
+    pumpkin_side_material,
+    pumpkin_side_material,
+  ];
+
+  bambu_material = [
+    bambu_side_material,
+    bambu_side_material,
+    bambu_top_material,
+    bambu_top_material,
+    bambu_side_material,
+    bambu_side_material,
+  ];
+
+  // Inventario: 10 casillas, cada una {type: string, count: number} o null vacía
+  let inventory = [];
+  const MAX_SLOTS = 10;
+  const MAX_STACK = 100;
+  for (let i = 0; i < MAX_SLOTS; i++) inventory.push(null);
+
+  // Slot seleccionado
+  let selectedSlot = 0;
+
+  // Mostrar inventario en pantalla
+  function drawInventory() {
+    const invSize = 50;
+    const spacing = 10;
+    const totalWidth = MAX_SLOTS * (invSize + spacing);
+
+    // Crear o limpiar el canvas del inventario
+    let canvas = document.getElementById("invCanvas");
+    if (!canvas) {
+      canvas = document.createElement("canvas");
+      canvas.id = "invCanvas";
+      canvas.width = window.innerWidth;
+      canvas.height = invSize + 40;
+      canvas.style.position = "fixed";
+      canvas.style.bottom = "10px";
+      canvas.style.left = "50%";
+      canvas.style.transform = "translateX(-50%)";
+      canvas.style.zIndex = "100";
+      document.body.appendChild(canvas);
+    }
+    const ctx = canvas.getContext("2d");
+
+    // Limpiar canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Dibujar fondo semitransparente
+    ctx.fillStyle = "rgba(0,0,0,0.5)";
+    ctx.fillRect((canvas.width - totalWidth) / 2 - spacing / 2, 0, totalWidth + spacing, invSize + 20);
+
+    // Para cada slot
+    for (let i = 0; i < MAX_SLOTS; i++) {
+      const x = (canvas.width - totalWidth) / 2 + i * (invSize + spacing);
+      const y = 10;
+
+      // Fondo slot
+      ctx.fillStyle = (i === selectedSlot) ? "yellow" : "rgba(255,255,255,0.1)";
+      ctx.fillRect(x, y, invSize, invSize);
+
+      // Dibujar textura del bloque si existe
+      if (inventory[i]) {
+        let img;
+        switch (inventory[i].type) {
+          case "dirt": img = dirt_texture.image; break;
+          case "grass_dirt": img = grass_dirt_texture.image; break;
+          case "grass": img = grass_texture.image; break;
+          case "barrel": img = barrel_sprite.image; break;
+          case "tnt": img = tnt_texture.image; break;
+          case "sack": img = sack_sprite.image; break;
+          case "melon": img = melon_sprite.image; break;
+          case "pumpkin": img = pumpkin_sprite.image; break;
+          case "bambu": img = bambu_side_texture.image; break;
+          default: img = null;
+        }
+        if (img) {
+          ctx.drawImage(img, x + 5, y + 5, invSize - 10, invSize - 10);
+        }
+        // Número abajo derecha
+        ctx.fillStyle = "white";
+        ctx.font = "bold 16px Arial";
+        ctx.textAlign = "right";
+        ctx.fillText(inventory[i].count, x + invSize - 5, y + invSize - 5);
+      }
+    }
+  }
+
+  // Cambiar slot con teclas 1-9,0
+  window.addEventListener("keydown", e => {
+    if (e.keyCode >= 49 && e.keyCode <= 57) { // 1-9
+      selectedSlot = e.keyCode - 49;
+      drawInventory();
+    } else if (e.keyCode === 48) { // 0 -> slot 9
+      selectedSlot = 9;
+      drawInventory();
+    }
+    if(e.key==="z"){
+      //alert("z presionado!")
+
+      cube2={}
+      for(i in cube){
+        cube2[i]={}
+        cube2[i].position=cube[i].position
+        cube2[i].type=cube[i].type
+        cube2[i].contentType=cube[i].contentType
+        cube2[i].number=cube[i].number
+      }
+
+      const objeto = {
+        camara: {
+          x: camera.position.x,
+          y: camera.position.y,
+          z: camera.position.z,
+        },
+        inventario: inventory,
+        cube3: cube2,
+      };
+
+      // 1. Convertir a JSON
+      const jsonStr = JSON.stringify(objeto, null, 2); // `null, 2` es para que esté formateado
+
+      // 2. Crear un blob con tipo MIME
+      const blob = new Blob([jsonStr], { type: "application/json" });
+
+      // 3. Crear un enlace de descarga
+      const enlace = document.createElement("a");
+      enlace.href = URL.createObjectURL(blob);
+      enlace.download = "datos.json"; // Nombre del archivo
+      enlace.click();
+
+      // 4. Liberar el objeto URL si quieres
+      URL.revokeObjectURL(enlace.href);
+    }
+    if(e.key==="c"){
+      //alert("c presionado!")
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".json";
+      input.style.display = "none";
+      document.body.appendChild(input);
+
+      input.addEventListener("change", (event) => {
+        const file = event.target.files[0];
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const contenido = e.target.result;
+          const obj = JSON.parse(contenido);
+          camera.position.x=obj.camara.x;
+          camera.position.y=obj.camara.y;
+          camera.position.z=obj.camara.z;
+          inventory=obj.inventario;
+          cube2=obj.cube3;
+          for(i in cube){
+            scene.remove(cube[i])
+            delete cube[i]
+          }
+          for(i in cube2){
+            /*
+            cube[i]={}
+            cube[i].position=cube2[i].position
+            cube[i].type=cube2[i].type
+            cube[i].contentType=cube2[i].contentType
+            cube[i].number=cube2[i].number
+            */
+            g(
+              cube2[i].position.x,
+              cube2[i].position.y,
+              cube2[i].position.z,
+              cube2[i].type,
+              cube2[i].contentType,
+              cube2[i].number,
+            )
+          }
+        };
+        reader.readAsText(file);
+      });
+
+      // Disparar selección de archivo
+      input.click();
+    }
+  });
+
+  // Función para añadir bloques al inventario
+  function addToInventory(type) {
+    // Primero intentar añadir a slot que ya tiene ese tipo
+    for (let i = 0; i < MAX_SLOTS; i++) {
+      if (inventory[i] && inventory[i].type === type && inventory[i].count < MAX_STACK) {
+        inventory[i].count++;
+        drawInventory();
+        return true;
+      }
+    }
+    // Si no hay slot con ese tipo, intentar añadir en slot vacío
+    for (let i = 0; i < MAX_SLOTS; i++) {
+      if (!inventory[i]) {
+        inventory[i] = { type: type, count: 1 };
+        drawInventory();
+        return true;
+      }
+    }
+    // No se pudo añadir (inventario lleno)
+    return false;
+  }
+
+  // Función para sacar bloque del inventario (para colocar)
+  function removeFromInventory(type) {
+    for (let i = 0; i < MAX_SLOTS; i++) {
+      if (inventory[i] && inventory[i].type === type && inventory[i].count > 0) {
+        inventory[i].count--;
+        if (inventory[i].count <= 0) inventory[i] = null;
+        drawInventory();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Actualizar placeBlock para usar inventario
+  placeBlock = () => {
+    const direction = new THREE.Vector3();
+    camera.getWorldDirection(direction);
+
+    const origin = camera.position.clone();
+    raycaster.set(origin, direction);
+
+    const cubesArray = Object.values(cube);
+    const intersects = raycaster.intersectObjects(cubesArray);
+
+    if (intersects.length > 0) {
+      const firstHit = intersects[0];
+      if (firstHit.distance < 5 && (!k[88])) { // rango para colocar bloques
+
+        if (!inventory[selectedSlot]) return;
+        if (inventory[selectedSlot].count <= 0) return;
+
+        const hitPos = firstHit.object.position.clone();
+        const faceNormal = firstHit.face.normal;
+        const placePos = hitPos.add(faceNormal);
+
+        let mat, tipo;
+        switch (inventory[selectedSlot].type) {
+          case "dirt": mat = dirt_material; tipo = "dirt"; break;
+          case "grass_dirt": mat = grass_dirt_material_full; tipo = "grass_dirt"; break;
+          case "grass": mat = grass_material; tipo = "grass"; break;
+          case "barrel": mat = barrel_material; tipo = "barrel"; break;
+          case "tnt": mat = tnt_material; tipo = "tnt"; break;
+          case "sack": mat = sack_material; tipo = "sack"; break;
+          case "melon": mat = melon_material; tipo = "melon"; break;
+          case "pumpkin": mat = pumpkin_material; tipo = "pumpkin"; break;
+          case "bambu": mat = bambu_material; tipo = "bambu"; break;
+          default: mat = dirt_material; tipo = "dirt";
+        }
+
+        const newCube = new THREE.Mesh(box, mat);
+        newCube.type=tipo
+        newCube.contentType=""
+        newCube.number=0
+        newCube.position.copy(placePos);
+
+        scene.add(newCube);
+
+        const key = `${placePos.x}_${placePos.y}_${placePos.z}`;
+        cube[key] = newCube;
+
+        // Aquí añadimos la lógica del impulso:
+        // Si el bloque se coloca justo debajo del jugador (distancia Y = -1 y X,Z igual o muy cercano)
+        // Se impulsa el jugador un poco hacia arriba
+        const playerX = Math.floor(camera.position.x);
+        const playerY = Math.floor(camera.position.y);
+        const playerZ = Math.floor(camera.position.z);
+
+        if (
+          Math.abs(placePos.x - playerX) <= 1.0 &&
+          Math.abs(placePos.z - playerZ) <= 1.0 &&
+          placePos.y === playerY - 1
+        ) {
+          // Impulso vertical hacia arriba (ajusta el valor según te guste)
+          camera.position.y++
+        }
+
+        removeFromInventory(tipo);
+      }
+      if (firstHit.distance < 5 && (k[88])) { // rango para colocar bloques
+        if (!inventory[selectedSlot]) return;
+        if (inventory[selectedSlot].count <= 0) return;
+
+        const hitPos = firstHit.object.position.clone();
+        const faceNormal = firstHit.face.normal;
+        const placePos = hitPos.add(faceNormal);
+        const playerX = Math.floor(camera.position.x);
+        const playerY = Math.floor(camera.position.y);
+        const playerZ = Math.floor(camera.position.z);
+        if (
+          Math.abs(placePos.x - playerX) <= 1.0 &&
+          Math.abs(placePos.z - playerZ) <= 1.0 &&
+          placePos.y === playerY - 1
+        ) {
+          console.log("no puedes poner bloques abajo mientras te agachas")
+        }else{
+          // Impulso vertical hacia arriba (ajusta el valor según te guste)
+
+          let mat, tipo;
+          switch (inventory[selectedSlot].type) {
+            case "dirt": mat = dirt_material; tipo = "dirt"; break;
+            case "grass_dirt": mat = grass_dirt_material_full; tipo = "grass_dirt"; break;
+            case "grass": mat = grass_material; tipo = "grass"; break;
+            case "barrel": mat = barrel_material; tipo = "barrel"; break;
+            case "tnt": mat = tnt_material; tipo = "tnt"; break;
+            case "sack": mat = sack_material; tipo = "sack"; break;
+            case "melon": mat = melon_material; tipo = "melon"; break;
+            case "pumpkin": mat = pumpkin_material; tipo = "pumpkin"; break;
+            case "bambu": mat = bambu_material; tipo = "bambu"; break;
+            default: mat = dirt_material; tipo = "dirt";
+          }
+
+          const newCube = new THREE.Mesh(box, mat);
+          newCube.type=tipo;
+          newCube.contentType=""
+          newCube.number=0
+          newCube.position.copy(placePos);
+
+          scene.add(newCube);
+
+          const key = `${placePos.x}_${placePos.y}_${placePos.z}`;
+          cube[key] = newCube;
+
+          // Aquí añadimos la lógica del impulso:
+          // Si el bloque se coloca justo debajo del jugador (distancia Y = -1 y X,Z igual o muy cercano)
+          // Se impulsa el jugador un poco hacia arriba
+          // camera.position.y++
+          removeFromInventory(tipo);
+        }
+      }
+    }
+  }
+
+  // Sustituye esta función:
+  breakBlock = () => {
+    if (breaking) return;
+
+    const direction = new THREE.Vector3();
+    camera.getWorldDirection(direction);
+
+    const origin = camera.position.clone();
+    raycaster.set(origin, direction);
+
+    const cubesArray = Object.values(cube);
+    const intersects = raycaster.intersectObjects(cubesArray);
+
+    if (intersects.length > 0) {
+      const firstHit = intersects[0];
+      if (firstHit.distance < 5) {
+        breakTarget = firstHit.object;
+        breaking = true;
+        breakProgress = 0;
+        breakStartTime = performance.now();
+
+        // Guardamos tipo antes de clonar material
+        let tipo = "dirt";
+        if (breakTarget.material === grass_dirt_material_full) tipo = "grass_dirt";
+        else if (breakTarget.material === grass_material) tipo = "grass";
+        else if (breakTarget.material === barrel_material) tipo = "barrel";
+        else if (breakTarget.material === tnt_material) tipo = "tnt";
+        else if (breakTarget.material === sack_material) tipo = "sack";
+        else if (breakTarget.material === melon_material) tipo = "melon";
+        else if (breakTarget.material === pumpkin_material) tipo = "pumpkin";
+        else if (breakTarget.material === bambu_material) tipo = "bambu";
+
+        breakTarget.userData.blockType = tipo;
+
+        // Clonamos el material para modificar la opacidad
+        if (Array.isArray(breakTarget.material)) {
+          breakTarget.material = breakTarget.material.map(mat => {
+            const clone = mat.clone();
+            clone.transparent = true;
+            clone.opacity = 1.0;
+            return clone;
+          });
+        } else {
+          breakTarget.material = breakTarget.material.clone();
+          breakTarget.material.transparent = true;
+          breakTarget.material.opacity = 1.0;
+        }
+
+        animateBreaking();
+      }
+    }
+  };
+
+  function animateBreaking() {
+    if (!breaking || !breakTarget) return;
+
+    const now = performance.now();
+    const elapsed = now - breakStartTime;
+    const totalDuration = 500; // ms
+
+    breakProgress = elapsed / totalDuration;
+
+    const newOpacity = 1.0 - breakProgress * 0.8;
+
+    if (Array.isArray(breakTarget.material)) {
+      breakTarget.material.forEach(mat => {
+        mat.opacity = Math.max(0.2, newOpacity);
+      });
+    } else {
+      breakTarget.material.opacity = Math.max(0.2, newOpacity);
+    }
+
+    if (elapsed >= totalDuration) {
+      // Usamos el tipo guardado
+      const tipo = breakTarget.userData.blockType || "dirt";
+
+      scene.remove(breakTarget);
+      for (let key in cube) {
+        if (cube[key] === breakTarget) {
+          delete cube[key];
+          break;
+        }
+      }
+
+      addToInventory(tipo);
+      breaking = false;
+      breakTarget = null;
+    } else {
+      requestAnimationFrame(animateBreaking);
+    }
+  }
+
+
+
+  // Sacar bloque dentro del barril:
+  getBlock = () => {
+    const direction = new THREE.Vector3();
+    camera.getWorldDirection(direction);
+
+    const origin = camera.position.clone();
+    raycaster.set(origin, direction);
+
+    const cubesArray = Object.values(cube);
+    const intersects = raycaster.intersectObjects(cubesArray);
+
+    if (intersects.length > 0) {
+      const firstHit = intersects[0];
+      if (firstHit.distance < 5) { // rango máximo para romper
+        const obj = firstHit.object;
+
+        // Guardar tipo de bloque para inventario según material
+        let tipo = "dirt";
+        if (obj.material === grass_dirt_material_full) tipo = "grass_dirt";
+        else if (obj.material === grass_material) tipo = "grass";
+        else if (obj.material === barrel_material) tipo = "barrel";
+        else if (obj.material === tnt_material) tipo = "tnt";
+        else if (obj.material === sack_material) tipo = "sack";
+        else if (obj.material === melon_material) tipo = "melon";
+        else if (obj.material === pumpkin_material) tipo = "pumpkin";
+        else if (obj.material === bambu_material) tipo = "bambu";
+
+        console.table(obj.contentType)
+
+        if(obj.number>0){
+          if(tipo=="barrel"||tipo=="sack"){
+            addToInventory(obj.contentType);
+            obj.number--
+          }else{
+            obj.contentType=""
+            obj.number=0
+          }
+        }
+      }
+    }
+  }
+
+  // Meter bloque dentro del barril:
+  putBlock = () => {
+    const direction = new THREE.Vector3();
+    camera.getWorldDirection(direction);
+
+    const origin = camera.position.clone();
+    raycaster.set(origin, direction);
+
+    const cubesArray = Object.values(cube);
+    const intersects = raycaster.intersectObjects(cubesArray);
+
+    if (intersects.length > 0) {
+      const firstHit = intersects[0];
+      if (firstHit.distance < 5) { // rango máximo para romper
+        const obj = firstHit.object;
+
+        // Guardar tipo de bloque para inventario según material
+        let tipo = "dirt";
+        if (obj.material === grass_dirt_material_full) tipo = "grass_dirt";
+        else if (obj.material === grass_material) tipo = "grass";
+        else if (obj.material === barrel_material) tipo = "barrel";
+        else if (obj.material === tnt_material) tipo = "tnt";
+        else if (obj.material === sack_material) tipo = "sack";
+        else if (obj.material === melon_material) tipo = "melon";
+        else if (obj.material === pumpkin_material) tipo = "pumpkin";
+
+        if(tipo=="barrel"){
+          let mat, tipo;
+          switch (inventory[selectedSlot].type) {
+            case "dirt": mat = dirt_material; tipo = "dirt"; break;
+            case "grass_dirt": mat = grass_dirt_material_full; tipo = "grass_dirt"; break;
+            case "grass": mat = grass_material; tipo = "grass"; break;
+            case "barrel": mat = barrel_material; tipo = "barrel"; break;
+            case "tnt": mat = tnt_material; tipo = "tnt"; break;
+            case "sack": mat = sack_material; tipo = "sack"; break;
+            case "melon": mat = melon_material; tipo = "melon"; break;
+            case "pumpkin": mat = pumpkin_material; tipo = "pumpkin"; break;
+            case "bambu": mat = bambu_material; tipo = "bambu"; break;
+            default: mat = dirt_material; tipo = "dirt";
+          }
+          if(obj.number<500){
+            if(obj.contentType==""){
+              obj.contentType=inventory[selectedSlot].type
+              obj.number=1
+              //alert("Has metido el primer "+inventory[selectedSlot].type+"!")
+              removeFromInventory(tipo);
+            }else if(obj.contentType==inventory[selectedSlot].type){
+              removeFromInventory(tipo);
+              obj.number++
+              //alert("Has metido el "+inventory[selectedSlot].type+" numero "+obj.number+"!")
+            }
+          }
+        }
+        if(tipo=="sack"){
+          let mat, tipo;
+          switch (inventory[selectedSlot].type) {
+            case "dirt": mat = dirt_material; tipo = "dirt"; break;
+            case "grass_dirt": mat = grass_dirt_material_full; tipo = "grass_dirt"; break;
+            case "grass": mat = grass_material; tipo = "grass"; break;
+            case "barrel": mat = barrel_material; tipo = "barrel"; break;
+            case "tnt": mat = tnt_material; tipo = "tnt"; break;
+            case "sack": mat = sack_material; tipo = "sack"; break;
+            case "melon": mat = melon_material; tipo = "melon"; break;
+            case "pumpkin": mat = pumpkin_material; tipo = "pumpkin"; break;
+            case "bambu": mat = bambu_material; tipo = "bambu"; break;
+            default: mat = dirt_material; tipo = "dirt";
+          }
+          if(obj.number<10){
+            if(obj.contentType==""){
+              obj.contentType=inventory[selectedSlot].type
+              obj.number=1
+              //alert("Has metido el primer "+inventory[selectedSlot].type+"!")
+              removeFromInventory(tipo);
+            }else if(obj.contentType==inventory[selectedSlot].type){
+              removeFromInventory(tipo);
+              obj.number++
+              //alert("Has metido el "+inventory[selectedSlot].type+" numero "+obj.number+"!")
+            }
+          }
+        }
+      }
+    }
+  }
+
+  moverSaco = (event) => {
+    console.log("mover saco clicked");
+
+    const mouse = new THREE.Vector2();
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(mouse, camera);
+
+    const cubesArray = Object.values(cube);
+    const intersects = raycaster.intersectObjects(cubesArray);
+
+    if (intersects.length > 0) {
+      const hit = intersects[0].object;
+
+      // Compara por material para identificar sacos
+      if (hit.material !== sack_material) {
+        console.log("Este bloque no es un saco, no se mueve.");
+        return;
+      }
+
+      const oldId = Object.keys(cube).find(key => cube[key] === hit);
+      if (!oldId) return;
+
+      const input = prompt(`Mover saco desde ${oldId} a (formato: x_y_z):`);
+      if (!input) return;
+
+      const [x, y, z] = input.split("_").map(Number);
+      if ([x, y, z].some(isNaN)) {
+        alert("Formato inválido. Usa x_y_z con números.");
+        return;
+      }
+
+      hit.position.set(x, y, z);
+
+      delete cube[oldId];
+      const newId = `${x}_${y}_${z}`;
+      cube[newId] = hit;
+
+      hit.userData.blockId = newId;
+
+      console.log(`Saco movido a ${newId}`);
+    }
+  }
+
+  document.addEventListener('mousedown', (event) => {
+    if (event.button === 0) { // botón izquierdo del mouse
+      if (document.pointerLockElement === document.body || document.mozPointerLockElement === document.body) {
+        breakBlock();
+      }
+    }
+    if (event.button === 1) { // botón izquierdo del mouse
+      if (document.pointerLockElement === document.body || document.mozPointerLockElement === document.body) {
+        moverSaco(event);
+      }
+    }
+    if (event.button === 2) { // clic derecho
+      if (document.pointerLockElement === document.body || document.mozPointerLockElement === document.body) {
+        placeBlock();
+      }
+    }
+  });
+
+  document.title = "MadDrFrank's Skyblock."
+  document.body.style.margin = 0
+  renderer = new THREE.WebGLRenderer()
+  document.body.appendChild(renderer.domElement)
+  camera = new THREE.PerspectiveCamera()
+  camera.xs = 0
+  camera.ys = 0
+  camera.zs = 0
+  camera.fov = 75
+  camera.near = 0.1
+  camera.far = 10000
+  scene = new THREE.Scene()
+  render()
+  setInterval(update, 20)
+  scene.background = new THREE.Color("rgb(200,200,200)")
+  scene.fog = new THREE.Fog("rgb(200,200,200)", 0.01, 100)
+  camera.position.set(0, 5, 0)
+  g(0, 0, 0, "barrel","grass_dirt",50)
+  g(0, 0, 1, "barrel","melon",1)
+  g(1, 0, 0, "barrel","pumpkin",1)
+  g(1, 0, 1, "barrel","bambu",1)
+}, 1)
+
+g = (x, y, z, obj, contentType="", number=0) => {
+  i1 = Math.random()
+  if (obj == "dirt") {
+    cube[i1] = new THREE.Mesh(box, dirt_material)
+    cube[i1].type="dirt"
+  }
+  if (obj == "grass_dirt") {
+    cube[i1] = new THREE.Mesh(box, grass_dirt_material_full)
+    cube[i1].type="grass_dirt"
+  }
+  if (obj == "barrel") {
+    cube[i1] = new THREE.Mesh(box, barrel_material)
+    cube[i1].contentType=contentType
+    cube[i1].number=number
+    cube[i1].type="barrel"
+  }
+  if (obj == "tnt") {
+    cube[i1] = new THREE.Mesh(box, tnt_material)
+    cube[i1].type="tnt"
+  }
+  if (obj == "sack") {
+    cube[i1] = new THREE.Mesh(box, sack_material)
+    cube[i1].contentType=contentType
+    cube[i1].number=number
+    cube[i1].type="sack"
+  }
+  if (obj == "melon") {
+    cube[i1] = new THREE.Mesh(box, melon_material)
+    cube[i1].type="melon"
+  }
+  if (obj == "pumpkin") {
+    cube[i1] = new THREE.Mesh(box, pumpkin_material)
+    cube[i1].type="pumpkin"
+  }
+  if (obj == "bambu") {
+    cube[i1] = new THREE.Mesh(box, bambu_material)
+    cube[i1].type="bambu"
+  }
+  cube[i1].position.set(x, y, z)
+  scene.add(cube[i1])
+}
+
+distance_to_object = (x, y, z, x2, y2, z2) => {
+  return Math.pow(((x - x2) * (x - x2) + (y - y2) * (y - y2) + (z - z2) * (z - z2)), 0.5)
+}
+
+check_into_object = (x, y, z, x2, y2, z2) => {
+  if (
+    (x - 0.4 < x2 + 0.4 && x + 0.4 > x2 - 0.4)
+    &&
+    (y - 0.4 < y2 + 0.4 && y + 0.4 > y2 - 0.4)
+    &&
+    (z - 0.4 < z2 + 0.4 && z + 0.4 > z2 - 0.4)
+  ) {
+    return true
+  } else {
+    return false
+  }
+}
+
+check_into_square = (x, y, z, x2, y2, z2, r) => {
+  if (
+    (x - r < x2 + r && x + r > x2 - r)
+    &&
+    (y - r < y2 + r && y + r > y2 - r)
+    &&
+    (z - r < z2 + r && z + r > z2 - r)
+  ) {
+    return true
+  } else {
+    return false
+  }
+}
+
+check_object = (x, y, z) => {
+  checked = false
+  for (i1 in cube) {
+    if (check_into_object(x, y, z, cube[i1].position.x, cube[i1].position.y, cube[i1].position.z)) {
+      checked = true
+    }
+  }
+  return checked
+}
+
+render = () => {
+  renderer.setSize(innerWidth, innerHeight)
+  camera.aspect = innerWidth / innerHeight
+  camera.updateProjectionMatrix()
+  requestAnimationFrame(render)
+  renderer.render(scene, camera)
+}
+
+onmousedown = () => {
+  if (document.pointerLockElement === document.body ||
+    document.mozPointerLockElement === document.body) {
+  } else {
+    document.body.requestPointerLock()
+  }
+}
+
+onmousemove = (event) => {
+  if (document.pointerLockElement === document.body ||
+    document.mozPointerLockElement === document.body) {
+    xa -= 0.01 * event.movementX
+    if (-1.5 < ya && 0 < event.movementY) {
+      ya -= 0.01 * event.movementY
+    }
+    if (ya < 1.5 && event.movementY < 0) {
+      ya -= 0.01 * event.movementY
+    }
+  }
+}
+
+addEventListener("keydown",(e)=>{
+  if (e.keyCode==81) {
+    putBlock();
+  }
+  if (e.keyCode==69) {
+    getBlock();
+  }
+})
+
+function isGrassBelow(cube, block) {
+  for (let key in cube) {
+    const other = cube[key];
+    if (
+      Math.floor(other.position.x) === Math.floor(block.position.x) &&
+      Math.floor(other.position.y) === Math.floor(block.position.y - 1) &&
+      Math.floor(other.position.z) === Math.floor(block.position.z) &&
+      other.type === "grass_dirt"
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function isOccupied(cube, x, y, z) {
+  for (let key in cube) {
+    const other = cube[key];
+    if (
+      Math.floor(other.position.x) === Math.floor(x) &&
+      Math.floor(other.position.y) === Math.floor(y) &&
+      Math.floor(other.position.z) === Math.floor(z)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function updatePerSecond() {
+  const directions = [
+    { x: 0, y: 0, z: 2 },
+    { x: 0, y: 0, z: -2 },
+    { x: 2, y: 0, z: 0 },
+    { x: -2, y: 0, z: 0 },
+  ];
+
+  const newMelons = [];
+
+  for (let key in cube) {
+    const block = cube[key];
+    if (block.type !== "melon") continue;
+
+    if (!isGrassBelow(cube, block)) continue;
+
+    for (let dir of directions) {
+      const nx = block.position.x + dir.x;
+      const ny = block.position.y + dir.y;
+      const nz = block.position.z + dir.z;
+
+      if (!isOccupied(cube, nx, ny, nz)) {
+        newMelons.push({ x: nx, y: ny, z: nz });
+      }
+    }
+  }
+
+  // Generar melones después de la iteración
+  for (let pos of newMelons) {
+    g(pos.x, pos.y, pos.z, "melon");
+  }
+}
+
+
+setInterval(updatePerSecond, 30 * 1000);
+
+function updatePumpkin() {
+  const directions = [
+    { x: 0, y: 0, z: 2 },
+    { x: 0, y: 0, z: -2 },
+    { x: 2, y: 0, z: 0 },
+    { x: -2, y: 0, z: 0 },
+  ];
+
+  const newPumpkins = [];
+
+  for (let key in cube) {
+    const block = cube[key];
+    if (block.type !== "pumpkin") continue; // <- corregido "pumkin" a "pumpkin"
+
+    if (!isGrassBelow(cube, block)) continue;
+
+    for (let dir of directions) {
+      const nx = block.position.x + dir.x;
+      const ny = block.position.y + dir.y;
+      const nz = block.position.z + dir.z;
+
+      if (!isOccupied(cube, nx, ny, nz)) {
+        newPumpkins.push({ x: nx, y: ny, z: nz });
+      }
+    }
+  }
+
+  for (let pos of newPumpkins) {
+    g(pos.x, pos.y, pos.z, "pumpkin");
+  }
+}
+
+setTimeout(() => {
+  setInterval(updatePumpkin, 30 * 1000);
+}, 20 * 1000);
+
+function updateBambu() {
+  const directions = [
+    { x: 0, y: 1, z: 0 },
+  ];
+
+  const newBambu = [];
+
+  for (let key in cube) {
+    const block = cube[key];
+    if (block.type !== "bambu") continue; // <- corregido "pumkin" a "pumpkin"
+
+    //if (!isGrassBelow(cube, block)) continue;
+
+    for (let dir of directions) {
+      const nx = block.position.x + dir.x;
+      const ny = block.position.y + dir.y;
+      const nz = block.position.z + dir.z;
+
+      if (!isOccupied(cube, nx, ny, nz)) {
+        newBambu.push({ x: nx, y: ny, z: nz });
+      }
+    }
+  }
+
+  for (let pos of newBambu) {
+    g(pos.x, pos.y, pos.z, "bambu");
+  }
+}
+
+setTimeout(() => {
+  setInterval(updateBambu, 30 * 1000);
+}, 10 * 1000);
+
+
+
+showInfo=false
+update = () => {
+  //coords.innerHTML="X:"+Math.round(camera.position.x)+" Y:"+Math.round(camera.position.y)+" Z:"+Math.round(camera.position.z)
+  if(showInfo==true){
+    coords.innerHTML=`
+<br>
+IMPORTANT! THIS GAME ONLY RUNS ON COMPUTER DEVICE.
+<br>
+Controls:
+<br>
+WASD: Move.
+<br>
+Spacebar: Jump.
+<br>
+X: Crouch like minecraft, but with same speed with X not pressed.
+<br>
+Left Click: Break Block.
+<br>
+Middle Click: Move a sack to a coordinates.
+<br>
+Right Click: Put block.
+<br>
+Q: Put block onto a barrel or sack.
+<br>
+E: Get block onto a barrel or sack.
+<br>
+R: Hide info.
+<br>
+T: Show info.
+<br>
+Z: Save file.
+<br>
+C: Load file.
+`
+  }else{
+    coords.innerHTML="X:"+Math.round(camera.position.x)+" Y:"+Math.round(camera.position.y)+" Z:"+Math.round(camera.position.z)+"<br>Press T to load info."
+  }
+  if(k[82]){showInfo=false}
+  if(k[84]){showInfo=true}
+  //if (camera.position.y < -10) camera.position.set(Math.random() * 5 - 2.5, 5, Math.random() * 5 - 2.5)
+  if (-1.5 > ya) { ya = -1.5 }
+  if (1.5 < ya) { ya = 1.5 }
+  camera.position.x += camera.xs
+  camera.position.y += camera.ys
+  camera.position.z += camera.zs
+  camera.xs *= 2 / 3
+  camera.zs *= 2 / 3
+  if (-1 < camera.ys) { camera.ys -= 0.0125 }
+  camera.lookAt(
+    camera.position.x + Math.sin(xa) * Math.cos(ya),
+    camera.position.y + Math.sin(ya),
+    camera.position.z + Math.cos(xa) * Math.cos(ya)
+  )
+  if(k[88]){
+    if (k[87]) {//Adelante
+      const nextX = camera.position.x + Math.sin(xa) * 0.1;
+      const nextZ = camera.position.z + Math.cos(xa) * 0.1;
+      const groundExists = check_object(nextX, camera.position.y - 3, nextZ);
+
+      if (groundExists) {
+        camera.position.x = nextX;
+        camera.position.z = nextZ;
+      } else {
+        // opcional: feedback visual o bloqueo
+        console.log("¡No hay suelo! Movimiento cancelado.");
+      }
+    }
+    if (k[83]) { // Atrás.
+      const nextX = camera.position.x - Math.sin(xa) * 0.1;
+      const nextZ = camera.position.z - Math.cos(xa) * 0.1;
+      const groundExists = check_object(nextX, camera.position.y - 3, nextZ);
+
+      if (groundExists) {
+        camera.position.x = nextX;
+        camera.position.z = nextZ;
+      } else {
+        // opcional: feedback visual o bloqueo
+        console.log("¡No hay suelo! Movimiento cancelado.");
+      }
+    }
+    if (k[65]) {//Izquierda.
+      const nextX = camera.position.x + Math.cos(xa) * 0.1;
+      const nextZ = camera.position.z - Math.sin(xa) * 0.1;
+      const groundExists = check_object(nextX, camera.position.y - 3, nextZ);
+
+      if (groundExists) {
+        camera.position.x = nextX;
+        camera.position.z = nextZ;
+      } else {
+        // opcional: feedback visual o bloqueo
+        console.log("¡No hay suelo! Movimiento cancelado.");
+      }
+    }
+    if (k[68]) { //Derecha.
+      const nextX = camera.position.x - Math.cos(xa) * 0.1;
+      const nextZ = camera.position.z + Math.sin(xa) * 0.1;
+      const groundExists = check_object(nextX, camera.position.y - 3, nextZ);
+
+      if (groundExists) {
+        camera.position.x = nextX;
+        camera.position.z = nextZ;
+      } else {
+        // opcional: feedback visual o bloqueo
+        console.log("¡No hay suelo! Movimiento cancelado.");
+      }
+    }
+  }else{
+    if (k[65]) {
+      camera.xs += 0.05 * Math.cos(xa)
+      camera.zs -= 0.05 * Math.sin(xa)
+    }
+    if (k[87]) {
+      camera.xs += 0.05 * Math.sin(xa)
+      camera.zs += 0.05 * Math.cos(xa)
+    }
+    if (k[68]) {
+      camera.xs -= 0.05 * Math.cos(xa)
+      camera.zs += 0.05 * Math.sin(xa)
+    }
+    if (k[83]) {
+      camera.xs -= 0.05 * Math.sin(xa)
+      camera.zs -= 0.05 * Math.cos(xa)
+    }
+  }
+  if (k[32]) { // Barra espaciadora.
+    if (check_object(camera.position.x, camera.position.y - 2.1, camera.position.z)) { camera.ys = 0.2 }
+  }
+  if (check_object(camera.position.x + camera.xs, camera.position.y, camera.position.z)) {
+    camera.xs = 0
+  }
+  if (check_object(camera.position.x, camera.position.y + camera.ys, camera.position.z)) {
+    camera.ys = 0
+  }
+  if (check_object(camera.position.x, camera.position.y, camera.position.z + camera.zs)) {
+    camera.zs = 0
+  }
+  if (check_object(camera.position.x + camera.xs, camera.position.y - 2, camera.position.z)) {
+    camera.xs = 0
+  }
+  if (check_object(camera.position.x, camera.position.y + camera.ys - 2, camera.position.z)) {
+    camera.ys = 0
+  }
+  if (check_object(camera.position.x, camera.position.y - 2, camera.position.z + camera.zs)) {
+    camera.zs = 0
+  }
+  render_distance = 100
+  fixed_x = Math.floor(camera.position.x)
+  fixed_y = Math.floor(camera.position.y)
+  fixed_z = Math.floor(camera.position.z)
+  for (let i1 in cube) {
+    if (
+      Math.abs(cube[i1].position.x - fixed_x) > render_distance ||
+      Math.abs(cube[i1].position.y - fixed_y) > render_distance ||
+      Math.abs(cube[i1].position.z - fixed_z) > render_distance
+    ) {
+      cube[i1].visible = false
+    } else {
+      cube[i1].visible = true
+    }
+  }
+}
+</script>
